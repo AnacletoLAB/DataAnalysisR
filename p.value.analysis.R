@@ -13,8 +13,13 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
   # CAT.* : sono variabili a valori categorici  
   # ORD.* : sono variabili a valori ordinali  
   
- print("Statistical analysis of input data \n")
+  library(pracma)
+  print("Chi square (categorical) and Mann Whitney UTest (numeric): Statistical analysis of input data \n")
+  
   var_types <- extract_type(data)
+  if (!(is.factor(LABEL))){
+    LABEL = as.factor(LABEL)
+  }
   lab.levels = levels(LABEL)
   if (length(lab.levels)>2){
     print('only binary levels are analyzed')
@@ -24,11 +29,18 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
   
   
  
+  strcls0 = paste("class ", lab.levels[1], sep ="")
+  strcls1 = paste("class ", lab.levels[2], sep ="")
   
   
-  colnames.df = c("all", paste("class ", lab.levels[1], sep =""), paste("class ", lab.levels[2], sep =""), 
-                       "p-value",
-                       "direction", "sens", "spec", "acc","PPV", "NPV", "MCC", "F1", "Auc")
+  colnames.df = c("all-str",paste(strcls0,"-str", sep =""), paste(strcls1,"-str", sep =""),"direction",
+                  "all-mean/media","all-s.e.", "all-min", "all-max",
+                  paste(strcls0,"-mean/median", sep =""),
+                  paste(strcls0,"-s.e.", sep =""),paste(strcls0,"-min", sep =""),paste(strcls0,"-max", sep =""),
+                  paste(strcls1,"-mean/median", sep =""),
+                  paste(strcls1,"-s.e.", sep =""),paste(strcls1,"-min", sep =""),paste(strcls1,"-max", sep =""),
+                       "p.value",
+                       "cutpoint", "sens", "spec", "acc","PPV", "NPV", "MCC", "F1", "Auc")
   df = as.data.frame(matrix(nrow = ncol(data), ncol = length(colnames.df)))
   rownames(df ) = colnames(data)
   colnames(df) = colnames.df
@@ -40,31 +52,39 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
       lab = LABEL[idx_use]
       var.now = var.now[idx_use]
       var.now_numeric= var.now
-      if(pracma::strcmp(unlist(var_types[nc]),'bin') || pracma::strcmp(unlist(var_types[nc]),'ord') || pracma::strcmp(unlist(var_types[nc]),'cat')){
+      cat(colnames(var.now), '\n')
+      if(strcmp(unlist(var_types[nc]),'bin') || strcmp(unlist(var_types[nc]),'ord') || strcmp(unlist(var_types[nc]),'cat')){
         var.now = as.factor(var.now)
         levels_var = levels(as.factor(var.now))
         label_on = levels_var[length(levels_var)]
-        cat('for categorical variable on value is = ', label_on, '\n')
+        cat('for ', var_types[nc], ' var: ', colnames(data)[nc] , ' ON/max category value is = ', label_on, '\n')
         
         p.value = chisq.test(x = var.now, y = lab, simulate.p.value = TRUE)
         
         str_chi = paste("p-value = ", round(p.value[["p.value"]],4), '\n', sep ="")
+ 
+          perc.on = round(100*length(which(var.now == label_on))/ length(var.now),1)
+          perc.on.in.low = round(100*(length(which(var.now == label_on & lab==lab.levels[1]))/ length(which(lab==lab.levels[1]))),1)
+          perc.on.in.high = round(100*(length(which(var.now == label_on & lab==lab.levels[2]))/ length(which(lab==lab.levels[2]))),1)
+          # cat(colnames(data)[nc], '\t'  , 
+          #     perc.on,'(', length(which(var.now == label_on)),')', '\t'  ,
+          #     perc.on.in.low, '(',length(which(var.now ==label_on & lab==lab.levels[1])), ')', '\t'  ,
+          #     perc.on.in.high, '(',length(which(var.now ==label_on & lab==lab.levels[2])), ')', '\t', str_chi)
+          if (perc.on.in.high>=perc.on.in.low){ 
+            direction =paste("class ", lab.levels[2], " >= class ", lab.levels[1])
+            est_dir = ">="
+          }else{
+            est_dir = "<="
+            direction = paste("class ", lab.levels[1], " >= class ", lab.levels[2])
+          }
+          first_estimates  = c(paste(perc.on, '%', sep=""), 
+                               paste(perc.on.in.low, '%', sep=""), 
+                               paste(perc.on.in.high, '%', sep=""), direction, 
+                               perc.on, NaN, NaN, NaN, 
+                               perc.on.in.low, NaN, NaN, NaN, 
+                               perc.on.in.high, NaN , NaN, NaN,
+                               round(p.value[["p.value"]],4))
         
-        perc.on = round(100*length(which(var.now == label_on))/ length(var.now),1)
-        perc.on.in.low = round(100*(length(which(var.now == label_on & lab==lab.levels[1]))/ length(which(lab==lab.levels[1]))),1)
-        perc.on.in.high = round(100*(length(which(var.now == label_on & lab==lab.levels[2]))/ length(which(lab==lab.levels[2]))),1)
-        # cat(colnames(data)[nc], '\t'  , 
-        #     perc.on,'(', length(which(var.now == label_on)),')', '\t'  ,
-        #     perc.on.in.low, '(',length(which(var.now ==label_on & lab==lab.levels[1])), ')', '\t'  ,
-        #     perc.on.in.high, '(',length(which(var.now ==label_on & lab==lab.levels[2])), ')', '\t', str_chi)
-        if (perc.on.in.high>=perc.on.in.low){ 
-          direction =paste("class ", lab.levels[2], " >= class ", lab.levels[1])
-          est_dir = ">="
-        }else{
-          est_dir = "<="
-          direction = paste("class ", lab.levels[1], " >= class ", lab.levels[2])
-        }
-        first_estimates  = c(paste(perc.on, '%', sep=""), paste(perc.on.in.low, '%', sep=""),  paste(perc.on.in.high, '%', sep=""), round(p.value[["p.value"]],4), direction)
         
       }else{
         true = TRUE
@@ -99,23 +119,27 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
         pgreat= wilcox.test(data[lab==lab.levels[1],nc],data[lab==lab.levels[2],nc],na.action = "na.omit", alternative = 'greater',  PAIRED = FALSE)
         pless =  wilcox.test(data[lab==lab.levels[1],nc],data[lab==lab.levels[2],nc], na.action = "na.omit", alternative = 'less',  PAIRED = FALSE)
         if (pgreat$p.value < pless$p.value){ 
-          str_w = paste("class ", lab.levels[1], " > class ", lab.levels[2], " p-value = ", round(pgreat$p.value,4), '\n', sep ="")
-          direction = paste("class ", lab.levels[1], " > class ", lab.levels[2])
+          str_w = paste("class ", lab.levels[1], " >= class ", lab.levels[2], " p-value = ", round(pgreat$p.value,4), '\n', sep ="")
+          direction = paste("class ", lab.levels[1], " >= class ", lab.levels[2])
           est_dir ="<="    # per cutpointr x is supposed to be smaller for the positive class
           p.val = pgreat$p.value
         }else{
           est_dir = ">="   # per cutpointr x is supposed to be smaller for the positive class
-          str_w = paste("class ", lab.levels[1], " < class ", lab.levels[2], " p-value = ", round(pless$p.value,4), '\n', sep ="")
-          direction = paste("class ", lab.levels[1], " > class ", lab.levels[2])
+          str_w = paste("class ", lab.levels[1], " <= class ", lab.levels[2], " p-value = ", round(pless$p.value,4), '\n', sep ="")
+          direction = paste("class ", lab.levels[1], " >= class ", lab.levels[2])
           p.val = pless$p.value
         }
         
        
       
-        first_estimates = c(paste( mean_v, ' ± ',  se_v, ' [',range_v[1],', ',range_v[2],']', sep =""),  
-          paste(mean_low, ' ± ',  se_low, ' [',range_low[1],', ',range_low[2],']', sep =""),
-          paste(mean_high, ' ± ',  se_high,' [',range_high[1],', ',range_high[2],']', sep =""), 
-          round(p.val,4),  direction)
+        first_estimates = c(paste( mean_v, ' ± ',  se_v, ' [',range_v[1],', ',range_v[2],']', sep =""), 
+                            paste(mean_low, ' ± ',  se_low, ' [',range_low[1],', ',range_low[2],']', sep =""),
+                            paste(mean_high, ' ± ',  se_high,' [',range_high[1],', ',range_high[2],']', sep =""),
+                            direction,
+                            mean_v, se_v, range_v[1],range_v[2],
+                            mean_low, se_low,range_low[1],range_low[2],
+                            mean_high,   se_high, range_high[1],range_high[2],
+                            round(p.val,4))
       }
       
       if (n.boot.runs==1){ 
@@ -131,7 +155,7 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
                            method = maximize_boot_metric,
                            metric = youden,
                            na.rm = TRUE, direction = est_dir)
-      cutpoint = mean(opt_cut$boot[[1]]$optimal_cutpoint)
+      cutpoint = median(opt_cut$boot[[1]]$optimal_cutpoint)
       
       
       TP = mean(opt_cut$boot[[1]]$TP_b)
@@ -158,9 +182,12 @@ p.value.analysis <- function( data, LABEL,  n.boot.runs = 100){
       #     '\t',AUC,
       #     '\t',  MCC, '\n')
       # 
-      first_estimates = c(first_estimates, sens,spec, Acc,PPV,NPV, MCC, F1.score, AUC)
+      first_estimates = c(first_estimates, cutpoint, sens,spec, Acc,PPV,NPV, MCC, F1.score, AUC)
       print(first_estimates)
       
+      if (length(first_estimates)< ncol(df)){
+        cat("ERROR!", colnames(data)[nc], ':', first_estimates, '\n')
+      }
       df[colnames(data)[nc], ] = first_estimates
       
      
