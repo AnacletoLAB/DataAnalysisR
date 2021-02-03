@@ -1,4 +1,4 @@
-RF_on_RF_and_Boruta <- function(data,LABEL, ext.folds, ntree = 31, num_folds = 10, num.inner.folds = 5, num.boruta.folds = 3) {
+RF_on_RF_and_Boruta <- function(data,LABEL, ext.folds, ntree = 31, num.inner.folds = 5, num.boruta.folds = 3) {
 
     
   library(randomForest)
@@ -12,8 +12,7 @@ RF_on_RF_and_Boruta <- function(data,LABEL, ext.folds, ntree = 31, num_folds = 1
   source(file.path('.', 'RF_on_Boruta_new.R'))
   source(file.path('.', 'boruta_n_fold_select.R'))
   
- # ext.folds <- createFolds(y= LABEL, k = num_folds, list = TRUE, returnTrain = FALSE)
-
+ 
   
   imp.rf = data.frame(matrix(0, nrow = length(ext.folds), ncol = ncol(data)))
   colnames(imp.rf) = colnames(data)
